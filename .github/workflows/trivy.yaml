@@ -10,7 +10,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'krishanx92/controller:tagname:v0.1.2'
+          image-ref: 'krishanx92/controller:v0.1.2'
           format: 'table'
           ignore-unfixed: true
           vuln-type: 'os,library'
