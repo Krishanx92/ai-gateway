@@ -1,0 +1,261 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.2
+  name: llmroutes.aigateway.envoyproxy.io
+spec:
+  group: aigateway.envoyproxy.io
+  names:
+    kind: LLMRoute
+    listKind: LLMRouteList
+    plural: llmroutes
+    singular: llmroute
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          LLMRoute combines multiple LLMBackends and attaching them to Gateway(s) resources.
+
+          This serves as a way to define a "unified" LLM API for a Gateway which allows downstream
+          clients to use a single schema API to interact with multiple LLM backends.
+
+          The inputSchema field is used to determine the structure of the requests that the Gateway will
+          receive. And then the Gateway will route the traffic to the appropriate LLMBackend based
+          on the output schema of the LLMBackend while doing the other necessary jobs like
+          upstream authentication, rate limit, etc.
+
+          LLMRoute generates a HTTPRoute resource based on the configuration basis for routing the traffic.
+          The generated HTTPRoute has the owner reference set to this LLMRoute.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec defines the details of the LLM policy.
+            properties:
+              inputSchema:
+                description: |-
+                  APISchema specifies the API schema of the input that the target Gateway(s) will receive.
+                  Based on this schema, the ai-gateway will perform the necessary transformation to the
+                  output schema specified in the selected LLMBackend during the routing process.
+
+                  Currently, the only supported schema is OpenAI as the input schema.
+                properties:
+                  schema:
+                    description: Schema is the API schema of the LLMRoute or LLMBackend.
+                    enum:
+                    - OpenAI
+                    - AWSBedrock
+                    type: string
+                  version:
+                    description: Version is the version of the API schema.
+                    type: string
+                required:
+                - schema
+                type: object
+                x-kubernetes-validations:
+                - rule: self.schema == 'OpenAI'
+              rules:
+                description: |-
+                  Rules is the list of LLMRouteRule that this LLMRoute will match the traffic to.
+                  Each rule is a subset of the HTTPRoute in the Gateway API (https://gateway-api.sigs.k8s.io/api-types/httproute/).
+
+                  AI Gateway controller will generate a HTTPRoute based on the configuration given here with the additional
+                  modifications to achieve the necessary jobs, notably inserting the AI Gateway external processor filter.
+
+                  In the matching conditions in the LLMRouteRule, `x-envoy-ai-gateway-llm-model` header is available
+                  if we want to describe the routing behavior based on the model name. The model name is extracted
+                  from the request content before the routing decision.
+
+                  How multiple rules are matched is the same as the Gateway API. See for the details:
+                  https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io%2fv1.HTTPRoute
+                items:
+                  description: LLMRouteRule is a rule that defines the routing behavior
+                    of the LLMRoute.
+                  properties:
+                    backendRefs:
+                      description: |-
+                        BackendRefs is the list of LLMBackend that this rule will route the traffic to.
+                        Each backend can have a weight that determines the traffic distribution.
+
+                        The namespace of each backend is "local", i.e. the same namespace as the LLMRoute.
+                      items:
+                        description: LLMRouteRuleBackendRef is a reference to a LLMBackend
+                          with a weight.
+                        properties:
+                          name:
+                            description: Name is the name of the LLMBackend.
+                            minLength: 1
+                            type: string
+                          weight:
+                            description: |-
+                              Weight is the weight of the LLMBackend. This is exactly the same as the weight in
+                              the BackendRef in the Gateway API. See for the details:
+                              https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io%2fv1.BackendRef
+                            minimum: 0
+                            type: integer
+                        required:
+                        - name
+                        - weight
+                        type: object
+                      maxItems: 128
+                      type: array
+                    matches:
+                      description: |-
+                        Matches is the list of LLMRouteMatch that this rule will match the traffic to.
+                        This is a subset of the HTTPRouteMatch in the Gateway API. See for the details:
+                        https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io%2fv1.HTTPRouteMatch
+                      items:
+                        properties:
+                          headers:
+                            description: |-
+                              Headers specifies HTTP request header matchers. See HeaderMatch in the Gateway API for the details:
+                              https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io%2fv1.HTTPHeaderMatch
+
+                              Currently, only the exact header matching is supported.
+                            items:
+                              description: |-
+                                HTTPHeaderMatch describes how to select a HTTP route by matching HTTP request
+                                headers.
+                              properties:
+                                name:
+                                  description: |-
+                                    Name is the name of the HTTP Header to be matched. Name matching MUST be
+                                    case insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).
+
+                                    If multiple entries specify equivalent header names, only the first
+                                    entry with an equivalent name MUST be considered for a match. Subsequent
+                                    entries with an equivalent header name MUST be ignored. Due to the
+                                    case-insensitivity of header names, "foo" and "Foo" are considered
+                                    equivalent.
+
+                                    When a header is repeated in an HTTP request, it is
+                                    implementation-specific behavior as to how this is represented.
+                                    Generally, proxies should follow the guidance from the RFC:
+                                    https://www.rfc-editor.org/rfc/rfc7230.html#section-3.2.2 regarding
+                                    processing a repeated header, with special handling for "Set-Cookie".
+                                  maxLength: 256
+                                  minLength: 1
+                                  pattern: ^[A-Za-z0-9!#$%&'*+\-.^_\x60|~]+$
+                                  type: string
+                                type:
+                                  default: Exact
+                                  description: |-
+                                    Type specifies how to match against the value of the header.
+
+                                    Support: Core (Exact)
+
+                                    Support: Implementation-specific (RegularExpression)
+
+                                    Since RegularExpression HeaderMatchType has implementation-specific
+                                    conformance, implementations can support POSIX, PCRE or any other dialects
+                                    of regular expressions. Please read the implementation's documentation to
+                                    determine the supported dialect.
+                                  enum:
+                                  - Exact
+                                  - RegularExpression
+                                  type: string
+                                value:
+                                  description: Value is the value of HTTP Header to
+                                    be matched.
+                                  maxLength: 4096
+                                  minLength: 1
+                                  type: string
+                              required:
+                              - name
+                              - value
+                              type: object
+                            maxItems: 16
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                            x-kubernetes-validations:
+                            - message: currently only exact match is supported
+                              rule: self.all(match, match.type != 'RegularExpression')
+                        type: object
+                      maxItems: 128
+                      type: array
+                  type: object
+                maxItems: 128
+                type: array
+              targetRefs:
+                description: TargetRefs are the names of the Gateway resources this
+                  LLMRoute is being attached to.
+                items:
+                  description: |-
+                    LocalPolicyTargetReferenceWithSectionName identifies an API object to apply a
+                    direct policy to. This should be used as part of Policy resources that can
+                    target single resources. For more information on how this policy attachment
+                    mode works, and a sample Policy resource, refer to the policy attachment
+                    documentation for Gateway API.
+
+                    Note: This should only be used for direct policy attachment when references
+                    to SectionName are actually needed. In all other cases,
+                    LocalPolicyTargetReference should be used.
+                  properties:
+                    group:
+                      description: Group is the group of the target resource.
+                      maxLength: 253
+                      pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                      type: string
+                    kind:
+                      description: Kind is kind of the target resource.
+                      maxLength: 63
+                      minLength: 1
+                      pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
+                      type: string
+                    name:
+                      description: Name is the name of the target resource.
+                      maxLength: 253
+                      minLength: 1
+                      type: string
+                    sectionName:
+                      description: |-
+                        SectionName is the name of a section within the target resource. When
+                        unspecified, this targetRef targets the entire resource. In the following
+                        resources, SectionName is interpreted as the following:
+
+                        * Gateway: Listener name
+                        * HTTPRoute: HTTPRouteRule name
+                        * Service: Port name
+
+                        If a SectionName is specified, but does not exist on the targeted object,
+                        the Policy must fail to attach, and the policy implementation should record
+                        a `ResolvedRefs` or similar Condition in the Policy's status.
+                      maxLength: 253
+                      minLength: 1
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                      type: string
+                  required:
+                  - group
+                  - kind
+                  - name
+                  type: object
+                maxItems: 128
+                type: array
+            required:
+            - inputSchema
+            - rules
+            type: object
+        type: object
+    served: true
+    storage: true
