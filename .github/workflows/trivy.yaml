@@ -25,7 +25,7 @@ jobs:
           IMAGE=envoy-proxy/ai-gateway-dev TAG=${{ github.sha }} make image
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.29.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: envoy-proxy/ai-gateway-dev:${{ github.sha }}
           format: 'table'
