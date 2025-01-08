@@ -14,7 +14,7 @@ jobs:
           format: 'table'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
   extProc:
     runs-on: ubuntu-latest
     steps:
@@ -25,4 +25,4 @@ jobs:
           format: 'table'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH' 
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW' 
