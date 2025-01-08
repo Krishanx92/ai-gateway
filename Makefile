@@ -13,7 +13,7 @@ GO_LDFLAGS += -X $(VERSION_PACKAGE).Version=$(GIT_COMMIT)
 OUTPUT_DIR ?= out
 
 # Arguments for docker builds.
-OCI_REGISTRY ?= krishanx92
+OCI_REGISTRY ?= ghcr.io/envoyproxy/ai-gateway
 TAG ?= latest
 ENABLE_MULTI_PLATFORMS ?= false
 
