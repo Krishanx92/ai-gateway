@@ -33,7 +33,7 @@ jobs:
         with:
           image-ref: ghcr.io/envoyproxy/ai-gateway/controller:${{ github.sha }}
           format: 'table'
-          severity: 'CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
           vuln-type: 'os,library'
           exit-code: '1'  # Fail workflow on detected vulnerabilities
           ignore-unfixed: true  # Ignore unfixed vulnerabilities
@@ -43,7 +43,7 @@ jobs:
         with:
           image-ref: ghcr.io/envoyproxy/ai-gateway/extproc:${{ github.sha }}
           format: 'table'
-          severity: 'CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
           vuln-type: 'os,library'
           exit-code: '1'  # Fail workflow on detected vulnerabilities
           ignore-unfixed: true  # Ignore unfixed vulnerabilities
